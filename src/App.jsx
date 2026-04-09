@@ -339,7 +339,7 @@ export default function App() {
   const [filterDateTo, setFilterDateTo] = useState("");
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [filterRevenue, setFilterRevenue] = useState("Tutti");
-  const [filterPeriod, setFilterPeriod] = useState("settimana");
+  const [filterPeriod, setFilterPeriod] = useState("tutt");
   const [filterStatus, setFilterStatus] = useState("attivi"); // attivi | passati | tutti
   const [daySelected, setDaySelected] = useState(null);
   const [loaded, setLoaded] = useState(false);
