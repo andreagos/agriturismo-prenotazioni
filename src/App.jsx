@@ -15,24 +15,26 @@ async function loadSheetJS() {
 async function parseExcelFile(file) {
   const XLSX = await loadSheetJS();
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array", cellDates: true });
+  const wb = XLSX.read(buf, { type: "array", cellDates: false });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
 
-  // Struttura colonne:
-  // 0=data, 1=tipo/nome, 2=nome cliente, 3=acconto, 4=quota affitto, 5=quota catering, 7=ricavo totale
+  // Converte serial date Excel in YYYY-MM-DD
+  const excelDateToStr = (serial) => {
+    if (!serial || typeof serial !== "number") return null;
+    const epoch = new Date(1899, 11, 30);
+    const d = new Date(epoch.getTime() + serial * 86400000);
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    const day = String(d.getDate()).padStart(2,"0");
+    return `${y}-${m}-${day}`;
+  };
+
   const bookings = [];
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const rawDate = row[0];
-    // Salta righe senza data valida (Date object da SheetJS)
-    if (!rawDate || typeof rawDate !== "object" || !(rawDate instanceof Date)) continue;
-
-    // Formattiamo la data come YYYY-MM-DD evitando problemi di timezone
-    const y = rawDate.getFullYear();
-    const m = String(rawDate.getMonth()+1).padStart(2,"0");
-    const d = String(rawDate.getDate()).padStart(2,"0");
-    const dateStr = `${y}-${m}-${d}`;
+    const dateStr = excelDateToStr(row[0]);
+    if (!dateStr || !dateStr.startsWith("20")) continue;
 
     const tipoRaw = row[1] ? String(row[1]).trim() : "";
     const nomeRaw = row[2] ? String(row[2]).trim() : "";
@@ -41,21 +43,16 @@ async function parseExcelFile(file) {
     const priceCatering = row[5] ? String(Math.round(Number(row[5]))) : "";
     const deposit = row[3] ? String(Math.round(Number(row[3]))) : "";
 
-    // Tipo basato su presenza location/catering
+    const hasLoc = !!(priceLocation && priceLocation !== "0");
+    const hasCat = !!(priceCatering && priceCatering !== "0");
     let type = "Location+Catering";
-    if (priceLocation && !priceCatering) type = "Location";
-    else if (!priceLocation && priceCatering) type = "Catering";
+    if (hasLoc && !hasCat) type = "Location";
+    else if (!hasLoc && hasCat) type = "Catering";
 
     bookings.push({
       id: `xl_${dateStr}_${i}`,
-      date: dateStr,
-      type,
-      status: "confermato",
-      notes,
-      people: "",
-      priceLocation,
-      priceCatering,
-      deposit,
+      date: dateStr, type, status: "confermato",
+      notes, people: "", priceLocation, priceCatering, deposit,
     });
   }
   return bookings;
